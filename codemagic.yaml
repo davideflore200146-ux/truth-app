@@ -24,7 +24,6 @@ workflows:
     artifacts:
       - android/app/build/outputs/**/*.apk
 
-
   react-native-ios:
     name: TRUTH iOS IPA
     max_build_duration: 60
@@ -56,6 +55,8 @@ workflows:
             -configuration Release \
             -sdk iphoneos \
             -archivePath $CM_BUILD_DIR/TRUTH.xcarchive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
             archive
 
       - name: Export IPA
