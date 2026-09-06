@@ -25,7 +25,7 @@ workflows:
       - android/app/build/outputs/**/*.apk
 
   react-native-ios:
-    name: TRUTH iOS IPA
+    name: TRUTH iOS IPA for Sideloadly
     max_build_duration: 60
     instance_type: mac_mini_m2
 
@@ -46,22 +46,25 @@ workflows:
           cd ios
           pod install
 
-      - name: Build iOS archive
+      - name: Build unsigned iOS archive
         script: |
           cd ios
+
           xcodebuild \
             -workspace TRUTH.xcworkspace \
             -scheme TRUTH \
             -configuration Release \
             -sdk iphoneos \
-            -archivePath $CM_BUILD_DIR/TRUTH.xcarchive \
-            CODE_SIGNING_ALLOWED=NO \
+            -archivePath "$CM_BUILD_DIR/TRUTH.xcarchive" \
+            CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            DEVELOPMENT_TEAM="" \
             archive
 
-      - name: Create ExportOptions.plist
+      - name: Create unsigned ExportOptions.plist
         script: |
-          cat > $CM_BUILD_DIR/ExportOptions.plist <<'EOF'
+          cat > "$CM_BUILD_DIR/ExportOptions.plist" <<'EOF'
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
@@ -70,6 +73,8 @@ workflows:
               <string>development</string>
               <key>signingStyle</key>
               <string>manual</string>
+              <key>signingCertificate</key>
+              <string>-</string>
               <key>compileBitcode</key>
               <false/>
           </dict>
@@ -78,14 +83,14 @@ workflows:
 
       - name: Export IPA
         script: |
-          mkdir -p $CM_BUILD_DIR/ipa
+          mkdir -p "$CM_BUILD_DIR/ipa"
 
           xcodebuild \
             -exportArchive \
-            -archivePath $CM_BUILD_DIR/TRUTH.xcarchive \
-            -exportOptionsPlist $CM_BUILD_DIR/ExportOptions.plist \
-            -exportPath $CM_BUILD_DIR/ipa
+            -archivePath "$CM_BUILD_DIR/TRUTH.xcarchive" \
+            -exportOptionsPlist "$CM_BUILD_DIR/ExportOptions.plist" \
+            -exportPath "$CM_BUILD_DIR/ipa"
 
     artifacts:
-      - $CM_BUILD_DIR/TRUTH.xcarchive
       - $CM_BUILD_DIR/ipa/*.ipa
+      - $CM_BUILD_DIR/TRUTH.xcarchive
