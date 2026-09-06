@@ -1,65 +1,73 @@
 workflows:
-react-native-android:
-name: TRUTH Android APK
-max_build_duration: 60
-instance_type: linux_x2
+  react-native-android:
+    name: TRUTH Android APK
+    max_build_duration: 60
+    instance_type: linux_x2
+
+    environment:
+      node: 20
+      groups:
+        - supabase
+
+    scripts:
+      - name: Install dependencies
+        script: npm install
+
+      - name: Prebuild Android project
+        script: npx expo prebuild --platform android
+
+      - name: Build APK
+        script: |
+          cd android
+          ./gradlew assembleRelease
+
+    artifacts:
+      - android/app/build/outputs/**/*.apk
 
 
-environment:
-  node: 20
-  groups:
-    - supabase
+  react-native-ios:
+    name: TRUTH iOS IPA
+    max_build_duration: 60
+    instance_type: mac_mini_m2
 
-scripts:
-  - name: Install dependencies
-    script: npm install
+    environment:
+      node: 20
+      groups:
+        - supabase
 
-  - name: Prebuild Android project
-    script: npx expo prebuild --platform android
+    scripts:
+      - name: Install dependencies
+        script: npm install
 
-  - name: Build APK
-    script: |
-      cd android
-      ./gradlew assembleRelease
+      - name: Prebuild iOS project
+        script: npx expo prebuild --platform ios
 
-artifacts:
-  - android/app/build/outputs/**/*.apk
+      - name: Install CocoaPods
+        script: |
+          cd ios
+          pod install
 
+      - name: Build iOS archive
+        script: |
+          cd ios
+          xcodebuild \
+            -workspace TRUTH.xcworkspace \
+            -scheme TRUTH \
+            -configuration Release \
+            -sdk iphoneos \
+            -archivePath $CM_BUILD_DIR/TRUTH.xcarchive \
+            archive
 
-react-native-ios:
-name: TRUTH iOS IPA
-max_build_duration: 60
-instance_type: mac_mini_m2
+      - name: Export IPA
+        script: |
+          mkdir -p $CM_BUILD_DIR/ipa
 
+          xcodebuild \
+            -exportArchive \
+            -archivePath $CM_BUILD_DIR/TRUTH.xcarchive \
+            -exportOptionsPlist $CM_BUILD_DIR/ExportOptions.plist \
+            -exportPath $CM_BUILD_DIR/ipa
 
-environment:
-  node: 20
-  groups:
-    - supabase
-
-scripts:
-  - name: Install dependencies
-    script: npm install
-
-  - name: Prebuild iOS project
-    script: npx expo prebuild --platform ios
-
-  - name: Install CocoaPods
-    script: |
-      cd ios
-      pod install
-
-  - name: Build iOS archive
-    script: |
-      cd ios
-      xcodebuild \
-        -workspace TRUTH.xcworkspace \
-        -scheme TRUTH \
-        -configuration Release \
-        -sdk iphoneos \
-        -archivePath $CM_BUILD_DIR/TRUTH.xcarchive \
-        archive
-
-artifacts:
-  - $CM_BUILD_DIR/TRUTH.xcarchive
-
+    artifacts:
+      - $CM_BUILD_DIR/TRUTH.xcarchive
+      - $CM_BUILD_DIR/ipa/*.ipa
