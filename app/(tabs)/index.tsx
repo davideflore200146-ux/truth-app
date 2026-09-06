@@ -7,8 +7,6 @@ import {
   StyleSheet,
   ScrollView,
   ActivityIndicator,
-  Image,
-  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -20,7 +18,6 @@ import {
   Star,
   Lock,
   Sparkles,
-  ShoppingBag,
   ChevronRight,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -39,8 +36,6 @@ interface MockResult {
   currency: string;
   results: PriceResult[];
 }
-
-const SAMPLE_IMAGE = 'https://images.pexels.com/photos/14979020/pexels-photo-14979020.jpeg?auto=compress&cs=tinysrgb&h=350&w=350';
 
 export default function HomeScreen() {
   const { t } = useI18n() as { t: (key: keyof TranslationMap) => string };
@@ -291,88 +286,6 @@ export default function HomeScreen() {
               <Star size={18} color={theme.colors.accent[500]} strokeWidth={2} />
               <Text style={[styles.favButtonText, { color: theme.colors.accent[600] }]}>{t('add_to_favorites')}</Text>
             </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Sample Product Card (shown before any search) */}
-        {!result && !loading && !hasSearched && (
-          <View style={styles.sampleSection}>
-            <Text style={[styles.sampleSectionTitle, { color: theme.textPrimary }]}>Esempio Risultato</Text>
-            <View style={[styles.sampleCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
-              {/* Product image + name */}
-              <View style={styles.sampleCardTop}>
-                <Image
-                  source={{ uri: SAMPLE_IMAGE }}
-                  style={styles.sampleImage}
-                  resizeMode="cover"
-                />
-                <View style={styles.sampleProductInfo}>
-                  <Text style={[styles.sampleProductName, { color: theme.textPrimary }]} numberOfLines={2}>
-                    iPhone 15 Pro 256GB
-                  </Text>
-                  <Text style={[styles.sampleProductSub, { color: theme.textSecondary }]}>
-                    Titanium Natural
-                  </Text>
-                  <View style={[styles.sampleTrendBadge, { backgroundColor: theme.colors.success[50] }]}>
-                    <TrendingDown size={13} color={theme.colors.success[500]} strokeWidth={2.5} />
-                    <Text style={[styles.sampleTrendText, { color: theme.colors.success[500] }]}>-12% questa settimana</Text>
-                  </View>
-                </View>
-              </View>
-
-              {/* Price boxes */}
-              <View style={styles.samplePriceRow}>
-                <View style={[styles.samplePriceBox, { backgroundColor: theme.colors.success[50], borderColor: theme.colors.success[400] }]}>
-                  <View style={styles.priceBoxHeader}>
-                    <TrendingDown size={15} color={theme.colors.success[500]} strokeWidth={2.5} />
-                    <Text style={[styles.priceBoxLabel, { color: theme.textSecondary }]}>{t('best_price')}</Text>
-                  </View>
-                  <Text style={[styles.sampleBestPrice, { color: theme.colors.success[500] }]}>
-                    1.029<Text style={styles.sampleCurrency}>€</Text>
-                  </Text>
-                </View>
-                <View style={[styles.samplePriceBox, { backgroundColor: theme.surfaceAlt, borderColor: theme.border }]}>
-                  <View style={styles.priceBoxHeader}>
-                    <TrendingUp size={15} color={theme.textTertiary} strokeWidth={2.5} />
-                    <Text style={[styles.priceBoxLabel, { color: theme.textSecondary }]}>{t('average_price')}</Text>
-                  </View>
-                  <Text style={[styles.sampleAvgPrice, { color: theme.textPrimary }]}>
-                    1.172<Text style={styles.sampleCurrency}>€</Text>
-                  </Text>
-                </View>
-              </View>
-
-              {/* Merchant offers with buy buttons */}
-              <View style={[styles.sampleMerchantSection, { borderTopColor: theme.border }]}>
-                {[
-                  { name: 'Amazon', price: '1.029', color: '#FF9900', shipping: 'Spedizione gratuita' },
-                  { name: 'eBay', price: '1.089', color: '#E53238', shipping: 'Spedizione €4.99' },
-                  { name: 'AliExpress', price: '1.156', color: '#FF4747', shipping: 'Spedizione gratuita' },
-                ].map((m, idx) => (
-                  <View key={idx} style={[styles.sampleMerchantRow, { borderBottomColor: theme.border }, idx === 2 && { borderBottomWidth: 0 }]}>
-                    <View style={[styles.sampleMerchantBadge, { backgroundColor: m.color + '22' }]}>
-                      <Text style={[styles.sampleMerchantLetter, { color: m.color }]}>{m.name.charAt(0)}</Text>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.sampleMerchantName, { color: theme.textPrimary }]}>{m.name}</Text>
-                      <Text style={[styles.sampleMerchantShip, { color: theme.textSecondary }]}>{m.shipping}</Text>
-                    </View>
-                    <Text style={[styles.sampleMerchantPrice, { color: theme.textPrimary }]}>€{m.price}</Text>
-                    <LinearGradient
-                      colors={theme.mode === 'dark' ? ['#3b6bff', '#9b5cff'] : ['#2b50f0', '#7c3aed']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 0 }}
-                      style={styles.buyButton}
-                    >
-                      <TouchableOpacity style={styles.buyButtonInner} activeOpacity={0.85}>
-                        <ShoppingBag size={14} color="#fff" strokeWidth={2.2} />
-                        <Text style={styles.buyButtonText}>Acquista</Text>
-                      </TouchableOpacity>
-                    </LinearGradient>
-                  </View>
-                ))}
-              </View>
-            </View>
           </View>
         )}
 
@@ -682,139 +595,6 @@ const styles = StyleSheet.create({
   },
   favButtonText: {
     fontSize: 16,
-    fontWeight: '700',
-  },
-  // Sample product card
-  sampleSection: {
-    marginTop: Spacing.lg,
-    paddingHorizontal: Spacing.lg,
-  },
-  sampleSectionTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    marginBottom: Spacing.md,
-  },
-  sampleCard: {
-    borderRadius: Radius.xl,
-    borderWidth: 1,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    elevation: 6,
-  },
-  sampleCardTop: {
-    flexDirection: 'row',
-    padding: Spacing.md,
-    gap: Spacing.md,
-  },
-  sampleImage: {
-    width: 90,
-    height: 90,
-    borderRadius: Radius.md,
-  },
-  sampleProductInfo: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  sampleProductName: {
-    fontSize: 17,
-    fontWeight: '700',
-    marginBottom: 2,
-  },
-  sampleProductSub: {
-    fontSize: 13,
-    marginBottom: Spacing.sm,
-  },
-  sampleTrendBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: Radius.pill,
-    alignSelf: 'flex-start',
-  },
-  sampleTrendText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  samplePriceRow: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
-    paddingHorizontal: Spacing.md,
-    paddingBottom: Spacing.md,
-  },
-  samplePriceBox: {
-    flex: 1,
-    borderRadius: Radius.lg,
-    padding: Spacing.md,
-    borderWidth: 1.5,
-  },
-  sampleBestPrice: {
-    fontSize: 26,
-    fontWeight: '800',
-  },
-  sampleAvgPrice: {
-    fontSize: 26,
-    fontWeight: '800',
-  },
-  sampleCurrency: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  sampleMerchantSection: {
-    borderTopWidth: 1,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
-  },
-  sampleMerchantRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-  },
-  sampleMerchantBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: Radius.sm,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  sampleMerchantLetter: {
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  sampleMerchantName: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  sampleMerchantShip: {
-    fontSize: 12,
-    marginTop: 1,
-  },
-  sampleMerchantPrice: {
-    fontSize: 17,
-    fontWeight: '800',
-    marginRight: Spacing.sm,
-  },
-  buyButton: {
-    borderRadius: Radius.sm,
-  },
-  buyButtonInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    borderRadius: Radius.sm,
-  },
-  buyButtonText: {
-    color: '#fff',
-    fontSize: 13,
     fontWeight: '700',
   },
   // Empty state
