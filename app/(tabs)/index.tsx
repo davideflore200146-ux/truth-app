@@ -7,6 +7,8 @@ import {
   StyleSheet,
   ScrollView,
   ActivityIndicator,
+  Linking,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -27,10 +29,11 @@ import { useI18n } from '@/contexts/I18nContext';
 import { TranslationMap } from '@/constants/translations';
 import { Logo } from '@/components/Logo';
 import { PriceResult } from '@/types/database';
+import { searchProduct } from '@/lib/api';
 
 type SearchMode = 'text' | 'url' | 'image';
 
-interface MockResult {
+interface SearchState {
   bestPrice: number;
   averagePrice: number;
   currency: string;
@@ -40,38 +43,58 @@ interface MockResult {
 export default function HomeScreen() {
   const { t } = useI18n() as { t: (key: keyof TranslationMap) => string };
   const { theme } = useTheme();
+
   const [mode, setMode] = useState<SearchMode>('text');
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<MockResult | null>(null);
+  const [result, setResult] = useState<SearchState | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [searchesLeft] = useState(10);
 
-  const handleSearch = useCallback(() => {
+  const handleSearch = useCallback(async () => {
     if (!query.trim()) return;
+
     setLoading(true);
     setResult(null);
+    setErrorMessage(null);
     setHasSearched(true);
 
-    setTimeout(() => {
-      const mockResults: PriceResult[] = [
-        { merchant: 'amazon', merchant_name: 'Amazon', price: 129.90, currency: 'EUR', url: '#', in_stock: true, shipping_cost: 0 },
-        { merchant: 'ebay', merchant_name: 'eBay', price: 135.00, currency: 'EUR', url: '#', in_stock: true, shipping_cost: 4.99 },
-        { merchant: 'aliexpress', merchant_name: 'AliExpress', price: 142.50, currency: 'EUR', url: '#', in_stock: true, shipping_cost: 0 },
-      ];
-      const prices = mockResults.map(r => r.price + (r.shipping_cost ?? 0));
-      const best = Math.min(...prices);
-      const avg = prices.reduce((a, b) => a + b, 0) / prices.length;
+    try {
+      const data = await searchProduct(query.trim(), mode);
 
-      setResult({
-        bestPrice: best,
-        averagePrice: Math.round(avg * 100) / 100,
-        currency: 'EUR',
-        results: mockResults.sort((a, b) => a.price - b.price),
-      });
+      if (!data.results.length) {
+        setResult(null);
+      } else {
+        setResult({
+          bestPrice: data.bestPrice,
+          averagePrice: data.averagePrice,
+          currency: data.currency,
+          results: data.results,
+        });
+      }
+    } catch (err: any) {
+      console.error('Errore ricerca prodotto:', err);
+      setErrorMessage(
+        err?.message || t('common_analysis_failed' as keyof TranslationMap) || 'Analisi fallita'
+      );
+    } finally {
       setLoading(false);
-    }, 1200);
-  }, [query]);
+    }
+  }, [query, mode, t]);
+
+  const handleOpenStore = useCallback(async (url: string) => {
+    if (!url) {
+      Alert.alert('Link non disponibile', 'Questo negozio non ha un link diretto.');
+      return;
+    }
+    const supported = await Linking.canOpenURL(url);
+    if (supported) {
+      await Linking.openURL(url);
+    } else {
+      Alert.alert('Impossibile aprire il link', url);
+    }
+  }, []);
 
   const modes: { key: SearchMode; label: string; icon: typeof Search }[] = [
     { key: 'text', label: t('search_by_text'), icon: Search },
@@ -111,7 +134,7 @@ export default function HomeScreen() {
                     active && { backgroundColor: theme.surface },
                     idx === 0 && styles.modeTabFirst,
                   ]}
-                  onPress={() => { setMode(m.key); setQuery(''); setResult(null); setHasSearched(false); }}
+                  onPress={() => { setMode(m.key); setQuery(''); setResult(null); setHasSearched(false); setErrorMessage(null); }}
                   activeOpacity={0.7}
                 >
                   <Icon
@@ -162,6 +185,7 @@ export default function HomeScreen() {
                   autoCapitalize="none"
                   autoCorrect={false}
                   selectionColor={theme.colors.primary[400]}
+                  onSubmitEditing={handleSearch}
                 />
               </View>
               <LinearGradient
@@ -221,8 +245,17 @@ export default function HomeScreen() {
           </View>
         )}
 
+        {/* Error state */}
+        {errorMessage && !loading && (
+          <View style={[styles.loadingCard, { backgroundColor: theme.surface, borderColor: theme.colors.danger?.[400] ?? '#ef4444' }]}>
+            <Text style={[styles.loadingText, { color: theme.textPrimary, textAlign: 'center' }]}>
+              {errorMessage}
+            </Text>
+          </View>
+        )}
+
         {/* Search Results */}
-        {result && !loading && (
+        {result && !loading && !errorMessage && (
           <View style={styles.resultsSection}>
             {/* Price Summary */}
             <View style={[styles.priceSummaryCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
@@ -237,6 +270,7 @@ export default function HomeScreen() {
                     {result.bestPrice.toFixed(2)} <Text style={styles.currencySymbol}>€</Text>
                   </Text>
                 </View>
+
                 <View style={[styles.priceBox, { backgroundColor: theme.surfaceAlt, borderColor: theme.border }]}>
                   <View style={styles.priceBoxHeader}>
                     <TrendingUp size={16} color={theme.textTertiary} strokeWidth={2.5} />
@@ -253,7 +287,12 @@ export default function HomeScreen() {
             <View style={styles.merchantList}>
               <Text style={[styles.merchantListTitle, { color: theme.textPrimary }]}>Offerte</Text>
               {result.results.map((r, idx) => (
-                <View key={idx} style={[styles.merchantCard, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+                <TouchableOpacity
+                  key={idx}
+                  style={[styles.merchantCard, { backgroundColor: theme.surface, borderColor: theme.border }]}
+                  activeOpacity={0.7}
+                  onPress={() => handleOpenStore(r.url)}
+                >
                   <View style={styles.merchantCardLeft}>
                     <View style={[styles.merchantBadge, { backgroundColor: (merchantColors[r.merchant_name] ?? theme.colors.primary[500]) + '22' }]}>
                       <Text style={[styles.merchantBadgeText, { color: merchantColors[r.merchant_name] ?? theme.colors.primary[500] }]}>
@@ -263,10 +302,11 @@ export default function HomeScreen() {
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.merchantName, { color: theme.textPrimary }]}>{r.merchant_name}</Text>
                       <Text style={[styles.merchantShipping, { color: theme.textSecondary }]}>
-                        {r.shipping_cost === 0 ? 'Spedizione gratuita' : `Spedizione €${r.shipping_cost!.toFixed(2)}`}
+                        {(r.shipping_cost ?? 0) === 0 ? 'Spedizione gratuita' : `Spedizione €${r.shipping_cost!.toFixed(2)}`}
                       </Text>
                     </View>
                   </View>
+
                   <View style={styles.merchantCardRight}>
                     <Text style={[styles.merchantPrice, { color: theme.textPrimary }]}>
                       €{r.price.toFixed(2)}
@@ -278,7 +318,7 @@ export default function HomeScreen() {
                     )}
                     <ChevronRight size={18} color={theme.textTertiary} strokeWidth={2} />
                   </View>
-                </View>
+                </TouchableOpacity>
               ))}
             </View>
 
@@ -290,7 +330,7 @@ export default function HomeScreen() {
         )}
 
         {/* Empty state after search with no results */}
-        {!result && !loading && hasSearched && (
+        {!result && !loading && !errorMessage && hasSearched && (
           <View style={styles.emptyState}>
             <View style={[styles.emptyIcon, { backgroundColor: theme.surfaceAlt }]}>
               <Search size={36} color={theme.textTertiary} strokeWidth={1.5} />
@@ -324,7 +364,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: 2,
   },
-  // Unified tab selector
   modeSelectorWrapper: {
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.sm,
@@ -349,7 +388,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
-  // Search card
   searchCard: {
     marginHorizontal: Spacing.lg,
     marginTop: Spacing.sm,
@@ -376,7 +414,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     padding: 0,
   },
-  // Gradient search button
   searchButtonGradient: {
     marginTop: Spacing.sm,
     borderRadius: Radius.md,
@@ -405,7 +442,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     textAlign: 'center',
   },
-  // Image mode
   imageUploadArea: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -424,7 +460,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
   },
-  // Quota bar
   quotaBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -452,7 +487,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
-  // Loading
   loadingCard: {
     marginHorizontal: Spacing.lg,
     marginTop: Spacing.xl,
@@ -465,7 +499,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: Spacing.md,
   },
-  // Results
   resultsSection: { marginTop: Spacing.lg },
   priceSummaryCard: {
     marginHorizontal: Spacing.lg,
@@ -517,7 +550,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
   },
-  // Merchant list
   merchantList: {
     marginHorizontal: Spacing.lg,
     marginTop: Spacing.lg,
@@ -597,7 +629,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
-  // Empty state
   emptyState: {
     alignItems: 'center',
     paddingVertical: Spacing.xxl,
