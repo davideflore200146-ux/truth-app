@@ -2,7 +2,7 @@ workflows:
   react-native-android:
     name: TRUTH Android APK
     max_build_duration: 60
-    instance_type: linux_x2
+    instance_type: linux
     environment:
       node: 20
       groups:
@@ -51,15 +51,3 @@ workflows:
             DEVELOPMENT_TEAM="" \
             archive
       - name: Package unsigned IPA manually
-        script: |
-          set -e
-          mkdir -p "$CM_BUILD_DIR/ipa/Payload"
-          APP_PATH=$(find "$CM_BUILD_DIR/TRUTH.xcarchive/Products/Applications" -maxdepth 1 -name "*.app" | head -n 1)
-          echo "App trovata in: $APP_PATH"
-          cp -r "$APP_PATH" "$CM_BUILD_DIR/ipa/Payload/"
-          cd "$CM_BUILD_DIR/ipa"
-          zip -r TRUTH.ipa Payload
-          echo "IPA creato: $CM_BUILD_DIR/ipa/TRUTH.ipa"
-    artifacts:
-      - $CM_BUILD_DIR/ipa/*.ipa
-      - $CM_BUILD_DIR/TRUTH.xcarchive
