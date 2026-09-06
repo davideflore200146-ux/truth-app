@@ -3,24 +3,19 @@ workflows:
     name: TRUTH Android APK
     max_build_duration: 60
     instance_type: linux_x2
-
     environment:
       node: 20
       groups:
         - supabase
-
     scripts:
       - name: Install dependencies
         script: npm install
-
       - name: Prebuild Android project
         script: npx expo prebuild --platform android
-
       - name: Build APK
         script: |
           cd android
           ./gradlew assembleRelease
-
     artifacts:
       - android/app/build/outputs/**/*.apk
 
@@ -28,28 +23,22 @@ workflows:
     name: TRUTH iOS IPA for Sideloadly
     max_build_duration: 60
     instance_type: mac_mini_m2
-
     environment:
       node: 20
       groups:
         - supabase
-
     scripts:
       - name: Install dependencies
         script: npm install
-
       - name: Prebuild iOS project
         script: npx expo prebuild --platform ios
-
       - name: Install CocoaPods
         script: |
           cd ios
           pod install
-
       - name: Build unsigned iOS archive
         script: |
           cd ios
-
           xcodebuild \
             -workspace TRUTH.xcworkspace \
             -scheme TRUTH \
@@ -61,36 +50,16 @@ workflows:
             CODE_SIGNING_ALLOWED=NO \
             DEVELOPMENT_TEAM="" \
             archive
-
-      - name: Create unsigned ExportOptions.plist
+      - name: Package unsigned IPA manually
         script: |
-          cat > "$CM_BUILD_DIR/ExportOptions.plist" <<'EOF'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-              <key>method</key>
-              <string>development</string>
-              <key>signingStyle</key>
-              <string>manual</string>
-              <key>signingCertificate</key>
-              <string>-</string>
-              <key>compileBitcode</key>
-              <false/>
-          </dict>
-          </plist>
-          EOF
-
-      - name: Export IPA
-        script: |
-          mkdir -p "$CM_BUILD_DIR/ipa"
-
-          xcodebuild \
-            -exportArchive \
-            -archivePath "$CM_BUILD_DIR/TRUTH.xcarchive" \
-            -exportOptionsPlist "$CM_BUILD_DIR/ExportOptions.plist" \
-            -exportPath "$CM_BUILD_DIR/ipa"
-
+          set -e
+          mkdir -p "$CM_BUILD_DIR/ipa/Payload"
+          APP_PATH=$(find "$CM_BUILD_DIR/TRUTH.xcarchive/Products/Applications" -maxdepth 1 -name "*.app" | head -n 1)
+          echo "App trovata in: $APP_PATH"
+          cp -r "$APP_PATH" "$CM_BUILD_DIR/ipa/Payload/"
+          cd "$CM_BUILD_DIR/ipa"
+          zip -r TRUTH.ipa Payload
+          echo "IPA creato: $CM_BUILD_DIR/ipa/TRUTH.ipa"
     artifacts:
       - $CM_BUILD_DIR/ipa/*.ipa
       - $CM_BUILD_DIR/TRUTH.xcarchive
