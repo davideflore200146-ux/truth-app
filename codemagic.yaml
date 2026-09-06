@@ -1,50 +1,82 @@
 workflows:
-  react-native-android:
-    name: TRUTH Android APK
-    max_build_duration: 60
-    instance_type: mac_mini_m2
-    environment:
-      node: 20
-      groups:
-        - supabase
-    scripts:
-      - name: Install dependencies
-        script: npm install
-      - name: Prebuild Android project
-        script: npx expo prebuild --platform android
-      - name: Build APK
-        script: |
-          cd android
-          ./gradlew assembleRelease
-    artifacts:
-      - android/app/build/outputs/**/*.apk
+react-native-android:
+name: TRUTH Android APK
+max_build_duration: 60
+instance_type: mac_mini_m2
 
-  react-native-ios:
-    name: TRUTH iOS
-    max_build_duration: 60
-    instance_type: mac_mini_m2
-    environment:
-      node: 20
-      groups:
-        - supabase
-    scripts:
-      - name: Install dependencies
-        script: npm install
-      - name: Prebuild iOS project
-        script: npx expo prebuild --platform ios
-      - name: Install CocoaPods
-        script: |
-          cd ios
-          pod install
-      - name: Build iOS app
-        script: |
-          cd ios
-          xcodebuild \
-            -workspace TRUTH.xcworkspace \
-            -scheme TRUTH \
-            -configuration Release \
-            -sdk iphoneos \
-            -archivePath $CM_BUILD_DIR/TRUTH.xcarchive \
-            archive
-    artifacts:
-      - $CM_BUILD_DIR/TRUTH.xcarchive
+
+environment:
+  node: 20
+  groups:
+    - supabase
+
+scripts:
+  - name: Install dependencies
+    script: npm install
+
+  - name: Prebuild Android project
+    script: npx expo prebuild --platform android
+
+  - name: Build APK
+    script: |
+      cd android
+      ./gradlew assembleRelease
+
+artifacts:
+  - android/app/build/outputs/**/*.apk
+
+
+react-native-ios:
+name: TRUTH iOS IPA
+max_build_duration: 60
+instance_type: mac_mini_m2
+
+
+integrations:
+  app_store_connect: codemagic
+
+environment:
+  node: 20
+
+  groups:
+    - supabase
+
+  ios_signing:
+    distribution_type: app_store
+    bundle_identifier: com.davideflore.truth
+
+  xcode: latest
+  cocoapods: default
+
+  vars:
+    XCODE_WORKSPACE: "TRUTH.xcworkspace"
+    XCODE_SCHEME: "TRUTH"
+
+scripts:
+  - name: Install dependencies
+    script: npm install
+
+  - name: Prebuild iOS project
+    script: npx expo prebuild --platform ios
+
+  - name: Install CocoaPods dependencies
+    script: |
+      cd ios
+      pod install
+
+  - name: Set up iOS code signing
+    script: |
+      xcode-project use-profiles \
+        --project "$CM_BUILD_DIR/ios/TRUTH.xcodeproj"
+
+  - name: Build IPA
+    script: |
+      xcode-project build-ipa \
+        --workspace "$CM_BUILD_DIR/ios/$XCODE_WORKSPACE" \
+        --scheme "$XCODE_SCHEME"
+
+artifacts:
+  - build/ios/ipa/*.ipa
+  - /tmp/xcodebuild_logs/*.log
+  - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.app
+  - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
