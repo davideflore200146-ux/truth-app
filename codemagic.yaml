@@ -37,10 +37,8 @@ integrations:
 
 environment:
   node: 20
-
   groups:
     - supabase
-
   ios_signing:
     distribution_type: app_store
     bundle_identifier: com.davideflore.truth
@@ -68,3 +66,4 @@ scripts:
 
 artifacts:
   - build/ios/ipa/*.ipa
+
