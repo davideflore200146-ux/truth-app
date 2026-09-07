@@ -2,7 +2,7 @@ workflows:
   react-native-android:
     name: TRUTH Android APK
     max_build_duration: 60
-    instance_type: linux
+    instance_type: mac_mini_m2
     environment:
       node: 20
       groups:
@@ -10,12 +10,15 @@ workflows:
     scripts:
       - name: Install dependencies
         script: npm install
+
       - name: Prebuild Android project
         script: npx expo prebuild --platform android
+
       - name: Build APK
         script: |
           cd android
           ./gradlew assembleRelease
+
     artifacts:
       - android/app/build/outputs/**/*.apk
 
@@ -30,12 +33,15 @@ workflows:
     scripts:
       - name: Install dependencies
         script: npm install
+
       - name: Prebuild iOS project
         script: npx expo prebuild --platform ios
+
       - name: Install CocoaPods
         script: |
           cd ios
           pod install
+
       - name: Build unsigned iOS archive
         script: |
           cd ios
@@ -50,6 +56,7 @@ workflows:
             CODE_SIGNING_ALLOWED=NO \
             DEVELOPMENT_TEAM="" \
             archive
+
       - name: Package unsigned IPA manually
         script: |
           set -e
@@ -60,6 +67,7 @@ workflows:
           cd "$CM_BUILD_DIR/ipa"
           zip -r TRUTH.ipa Payload
           echo "IPA creato: $CM_BUILD_DIR/ipa/TRUTH.ipa"
+
     artifacts:
       - $CM_BUILD_DIR/ipa/*.ipa
       - $CM_BUILD_DIR/TRUTH.xcarchive
