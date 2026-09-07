@@ -14,9 +14,6 @@ jobs:
       EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
       EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
       EXPO_PUBLIC_API_BASE_URL: ${{ secrets.EXPO_PUBLIC_API_BASE_URL }}
-      # Se hai una chiave RevenueCat separata per iOS, scommenta la riga sotto
-      # e crea il secret corrispondente su GitHub:
-      # EXPO_PUBLIC_REVENUECAT_API_KEY_IOS: ${{ secrets.EXPO_PUBLIC_REVENUECAT_API_KEY_IOS }}
 
     steps:
       - name: Checkout repository
@@ -44,7 +41,9 @@ jobs:
         run: |
           WORKSPACE=$(find ios -maxdepth 1 -name "*.xcworkspace" | head -n 1)
           echo "Workspace trovato: $WORKSPACE"
-          SCHEME=$(xcodebuild -workspace "$WORKSPACE" -list | awk '/Schemes:/{flag=1;next} flag && NF{print; exit}' | xargs)
+          # Lo scheme dell'app nei progetti Expo ha lo stesso nome del workspace
+          # (a differenza degli schemi dei moduli Pods tipo EXConstants, ExpoModulesCore, ecc.)
+          SCHEME=$(basename "$WORKSPACE" .xcworkspace)
           echo "Scheme trovato: $SCHEME"
           echo "workspace=$WORKSPACE" >> "$GITHUB_OUTPUT"
           echo "scheme=$SCHEME" >> "$GITHUB_OUTPUT"
