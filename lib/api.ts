@@ -2,7 +2,7 @@ import { supabase } from '@/lib/supabase';
 import { SearchQuota, Profile, PriceResult, SearchType } from '@/types/database';
 import { FREE_MONTHLY_SEARCH_LIMIT, getCurrentMonthYear } from '@/constants/config';
 
-// ⚠️ URL del tuo backend Render (Node/Express + Tavily + Groq)
+// URL del tuo backend Render (Node/Express + Tavily + Groq)
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'https://truth1.onrender.com';
 
 export async function getOrCreateQuota(userId: string): Promise<SearchQuota | null> {
@@ -99,10 +99,6 @@ export interface ProductSearchResult {
   score?: number;
 }
 
-/**
- * Chiama il backend TRUTH (Render → Tavily → Groq) per fare
- * un'analisi reale del prodotto cercato, invece di dati finti.
- */
 export async function searchProduct(
   query: string,
   searchType: SearchType = 'text'
@@ -122,8 +118,6 @@ export async function searchProduct(
 
   const data = await response.json();
 
-  // ⚠️ Adatta questi nomi di campo se il tuo backend (prompts.js /
-  // ANALYSIS_SYSTEM_PROMPT) usa nomi diversi per l'array delle offerte.
   const rawOffers: any[] = Array.isArray(data.offers) ? data.offers : [];
 
   const results: PriceResult[] = rawOffers.map((offer) => ({
@@ -137,7 +131,6 @@ export async function searchProduct(
       offer.shipping_cost !== undefined ? Number(offer.shipping_cost) : 0,
   }));
 
-  // Scarta eventuali offerte senza link reale o senza prezzo valido
   const validResults = results.filter((r) => r.url && r.price > 0);
 
   const prices = validResults.map((r) => r.price + (r.shipping_cost ?? 0));
