@@ -51,6 +51,7 @@ function getSearchIcon(type: SearchType) {
 export default function HistoryScreen() {
   const { t } = useI18n() as { t: (key: keyof TranslationMap) => string };
   const { theme } = useTheme();
+
   const [records, setRecords] = useState<SearchRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -59,12 +60,14 @@ export default function HistoryScreen() {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { setLoading(false); return; }
+
       const { data, error } = await supabase
         .from('searches')
         .select('*')
         .eq('user_id', session.user.id)
         .order('created_at', { ascending: false })
         .limit(100);
+
       if (!error && data) setRecords(data as SearchRecord[]);
     } catch {
     } finally {
@@ -102,6 +105,7 @@ export default function HistoryScreen() {
             <Icon size={18} color={theme.colors.primary[500]} strokeWidth={2} />
           </View>
         </View>
+
         <View style={styles.cardBody}>
           <Text style={[styles.cardQuery, { color: theme.textPrimary }]} numberOfLines={2}>{item.query}</Text>
           <View style={styles.cardMetaRow}>
@@ -122,6 +126,7 @@ export default function HistoryScreen() {
             )}
           </View>
         </View>
+
         <TouchableOpacity style={styles.deleteBtn} onPress={() => handleDelete(item.id)} activeOpacity={0.6}>
           <Trash2 size={16} color={theme.textTertiary} strokeWidth={2} />
         </TouchableOpacity>
@@ -226,6 +231,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center',
     marginBottom: Spacing.lg,
   },
-  emptyTitle: { fontSize: 20, fontWeight: '700', marginBottom: 4 },
+  emptyTitle: { fontSize: 20, fontWeight: '700', marginBottom: 4, textAlign: 'center' },
   emptyHint: { fontSize: 15, textAlign: 'center' },
 });
