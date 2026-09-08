@@ -1,230 +1,177 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabase } from '@/lib/supabase';
+import { SearchQuota, Profile, PriceResult, SearchType } from '@/types/database';
+import { FREE_MONTHLY_SEARCH_LIMIT, getCurrentMonthYear } from '@/constants/config';
 
-const API_BASE_URL =
-process.env.EXPO_PUBLIC_API_BASE_URL || 'https://truth1.onrender.com';
+// ⚠️ URL del tuo backend Render (Node/Express + Tavily + Groq)
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || 'https://truth1.onrender.com';
 
-export type SearchType = 'product' | 'hotel' | 'restaurant' | 'flight';
+export async function getOrCreateQuota(userId: string): Promise<SearchQuota | null> {
+  const monthYear = getCurrentMonthYear();
 
-export interface PriceResult {
-merchant: string;
-merchant_name: string;
-price: number;
-currency: string;
-url: string;
-in_stock: boolean;
-shipping_cost?: number;
+  const { data: existing } = await supabase
+    .from('search_quotas')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('month_year', monthYear)
+    .maybeSingle();
+
+  if (existing) {
+    return existing as SearchQuota;
+  }
+
+  const { data: created, error } = await supabase
+    .from('search_quotas')
+    .insert({
+      user_id: userId,
+      month_year: monthYear,
+      search_count: 0,
+      max_searches: FREE_MONTHLY_SEARCH_LIMIT,
+    })
+    .select('*')
+    .maybeSingle();
+
+  if (error) return null;
+  return created as SearchQuota;
 }
 
-export interface SearchResponse {
-bestPrice: number;
-averagePrice: number;
-results: PriceResult[];
+export async function canUserSearch(
+  userId: string,
+  isPremium: boolean
+): Promise<{ allowed: boolean; remaining: number; quota: SearchQuota | null }> {
+  if (isPremium) {
+    return { allowed: true, remaining: -1, quota: null };
+  }
+
+  const quota = await getOrCreateQuota(userId);
+  if (!quota) {
+    return { allowed: false, remaining: 0, quota: null };
+  }
+
+  const remaining = Math.max(0, quota.max_searches - quota.search_count);
+  return { allowed: remaining > 0, remaining, quota };
 }
 
-export async function searchProduct(
-query: string,
-searchType: SearchType = 'product'
-): Promise<SearchResponse> {
-try {
-console.log('[TRUTH API] Ricerca:', query);
-console.log('[TRUTH API] Tipo:', searchType);
-console.log('[TRUTH API] URL:', `${API_BASE_URL}/api/analyze`);
+export async function incrementSearchCount(userId: string): Promise<void> {
+  const quota = await getOrCreateQuota(userId);
+  if (!quota) return;
 
-
-const response = await fetch(`${API_BASE_URL}/api/analyze`, {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'application/json',
-    Accept: 'application/json',
-  },
-  body: JSON.stringify({
-    query: query.trim(),
-    type: searchType,
-  }),
-});
-
-console.log('[TRUTH API] Status HTTP:', response.status);
-
-const responseText = await response.text();
-
-console.log('[TRUTH API] RISPOSTA TESTO:', responseText);
-
-if (!response.ok) {
-  throw new Error(
-    `Errore API ${response.status}: ${responseText || 'Risposta vuota'}`
-  );
+  await supabase
+    .from('search_quotas')
+    .update({ search_count: quota.search_count + 1 })
+    .eq('id', quota.id);
 }
 
-let data: any;
+export async function getUserProfile(userId: string): Promise<Profile | null> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', userId)
+    .maybeSingle();
 
-try {
-  data = JSON.parse(responseText);
-} catch (parseError) {
-  console.error('[TRUTH API] Errore parsing JSON:', parseError);
-  throw new Error('La risposta del server non è un JSON valido.');
+  if (error) return null;
+  return data as Profile;
 }
 
-console.log(
-  '[TRUTH API] RISPOSTA COMPLETA:',
-  JSON.stringify(data, null, 2)
-);
-
-console.log('[TRUTH API] offers:', data?.offers);
-console.log('[TRUTH API] results:', data?.results);
-console.log('[TRUTH API] products:', data?.products);
-
-let rawOffers: any[] = [];
-
-if (Array.isArray(data?.offers)) {
-  rawOffers = data.offers;
-} else if (Array.isArray(data?.results)) {
-  rawOffers = data.results;
-} else if (Array.isArray(data?.products)) {
-  rawOffers = data.products;
-}
-
-console.log(
-  '[TRUTH API] ELEMENTI TROVATI:',
-  rawOffers.length
-);
-
-const results: PriceResult[] = rawOffers
-  .map((offer: any) => {
-    const merchant =
-      offer?.store ||
-      offer?.merchant ||
-      offer?.merchant_name ||
-      offer?.shop ||
-      offer?.seller ||
-      'Negozio';
-
-    const merchantName =
-      offer?.store ||
-      offer?.merchant_name ||
-      offer?.merchant ||
-      offer?.shop ||
-      offer?.seller ||
-      'Negozio';
-
-    let priceValue =
-      offer?.price ??
-      offer?.currentPrice ??
-      offer?.current_price ??
-      offer?.amount ??
-      offer?.sale_price ??
-      offer?.salePrice;
-
-    if (typeof priceValue === 'string') {
-      priceValue = priceValue
-        .replace(/[^\d,.-]/g, '')
-        .replace(/\.(?=\d{3}(?:\D|$))/g, '')
-        .replace(',', '.');
-    }
-
-    const price = Number(priceValue);
-
-    const currency =
-      offer?.currency ||
-      offer?.currency_code ||
-      offer?.currencyCode ||
-      'EUR';
-
-    const url =
-      offer?.url ||
-      offer?.link ||
-      offer?.product_url ||
-      offer?.productUrl ||
-      offer?.href ||
-      '';
-
-    const inStock =
-      offer?.in_stock !== false &&
-      offer?.inStock !== false;
-
-    let shippingCost: number | undefined;
-
-    const shippingValue =
-      offer?.shipping_cost ??
-      offer?.shippingCost ??
-      offer?.shipping;
-
-    if (shippingValue !== undefined && shippingValue !== null) {
-      if (typeof shippingValue === 'string') {
-        const cleanedShipping = shippingValue
-          .replace(/[^\d,.-]/g, '')
-          .replace(/\.(?=\d{3}(?:\D|$))/g, '')
-          .replace(',', '.');
-
-        const parsedShipping = Number(cleanedShipping);
-
-        if (!Number.isNaN(parsedShipping)) {
-          shippingCost = parsedShipping;
-        }
-      } else {
-        const parsedShipping = Number(shippingValue);
-
-        if (!Number.isNaN(parsedShipping)) {
-          shippingCost = parsedShipping;
-        }
-      }
-    }
-
-    return {
-      merchant: String(merchant),
-      merchant_name: String(merchantName),
-      price,
-      currency: String(currency),
-      url: String(url),
-      in_stock: inStock,
-      ...(shippingCost !== undefined
-        ? { shipping_cost: shippingCost }
-        : {}),
-    };
-  })
-  .filter((result: PriceResult) => {
-    return Number.isFinite(result.price) && result.price > 0;
+export async function addFavorite(params: {
+  user_id: string;
+  query: string;
+  search_type: SearchType;
+  target_price?: number | null;
+  last_best_price?: number | null;
+}): Promise<void> {
+  const { error } = await supabase.from('favorites').insert({
+    user_id: params.user_id,
+    query: params.query,
+    search_type: params.search_type,
+    target_price: params.target_price ?? null,
+    last_best_price: params.last_best_price ?? null,
+    last_checked_at: new Date().toISOString(),
   });
 
-console.log(
-  '[TRUTH API] RISULTATI FINALI:',
-  JSON.stringify(results, null, 2)
-);
-
-if (results.length === 0) {
-  console.warn(
-    '[TRUTH API] Nessun risultato con prezzo valido.'
-  );
+  if (error) throw error;
 }
 
-const prices = results
-  .map((result) => result.price)
-  .filter((price) => Number.isFinite(price) && price > 0);
-
-const bestPrice =
-  prices.length > 0 ? Math.min(...prices) : 0;
-
-const averagePrice =
-  prices.length > 0
-    ? prices.reduce((sum, price) => sum + price, 0) /
-      prices.length
-    : 0;
-
-return {
-  bestPrice,
-  averagePrice,
-  results,
-};
-
-
-} catch (error: any) {
-console.error('[TRUTH API] ERRORE:', error);
-
-
-throw new Error(
-  error?.message ||
-    'Impossibile ottenere i risultati dal server.'
-);
-
-
+export function buildAffiliateUrl(
+  baseUrl: string,
+  productPath: string,
+  tagParam: string,
+  tagValue: string
+): string {
+  if (!tagValue) {
+    return `${baseUrl}${productPath}`;
+  }
+  const separator = productPath.includes('?') ? '&' : '?';
+  return `${baseUrl}${productPath}${separator}${tagParam}=${tagValue}`;
 }
+
+// ─────────────────────────────────────────────────────────────
+// RICERCA PRODOTTO REALE (sostituisce i mockResults)
+// ─────────────────────────────────────────────────────────────
+
+export interface ProductSearchResult {
+  name: string;
+  bestPrice: number;
+  averagePrice: number;
+  currency: string;
+  results: PriceResult[];
+  verdict?: string;
+  score?: number;
+}
+
+/**
+ * Chiama il backend TRUTH (Render → Tavily → Groq) per fare
+ * un'analisi reale del prodotto cercato, invece di dati finti.
+ */
+export async function searchProduct(
+  query: string,
+  searchType: SearchType = 'text'
+): Promise<ProductSearchResult> {
+  const response = await fetch(`${API_BASE_URL}/api/analyze`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query, type: searchType }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => '');
+    throw new Error(
+      `Errore backend (${response.status}): ${errorText || 'analisi fallita'}`
+    );
+  }
+
+  const data = await response.json();
+
+  // ⚠️ Adatta questi nomi di campo se il tuo backend (prompts.js /
+  // ANALYSIS_SYSTEM_PROMPT) usa nomi diversi per l'array delle offerte.
+  const rawOffers: any[] = Array.isArray(data.offers) ? data.offers : [];
+
+  const results: PriceResult[] = rawOffers.map((offer) => ({
+    merchant: (offer.store || offer.merchant || 'shop').toLowerCase(),
+    merchant_name: offer.store || offer.merchant_name || offer.merchant || 'Negozio',
+    price: Number(offer.price) || 0,
+    currency: offer.currency || 'EUR',
+    url: offer.url || offer.link || '',
+    in_stock: offer.in_stock !== false,
+    shipping_cost:
+      offer.shipping_cost !== undefined ? Number(offer.shipping_cost) : 0,
+  }));
+
+  // Scarta eventuali offerte senza link reale o senza prezzo valido
+  const validResults = results.filter((r) => r.url && r.price > 0);
+
+  const prices = validResults.map((r) => r.price + (r.shipping_cost ?? 0));
+  const bestPrice = prices.length ? Math.min(...prices) : Number(data.currentPrice) || 0;
+  const averagePrice = prices.length
+    ? Math.round((prices.reduce((a, b) => a + b, 0) / prices.length) * 100) / 100
+    : Number(data.currentPrice) || 0;
+
+  return {
+    name: data.name || query,
+    bestPrice,
+    averagePrice,
+    currency: validResults[0]?.currency || 'EUR',
+    results: validResults.sort((a, b) => a.price - b.price),
+    verdict: data.verdict,
+    score: data.score,
+  };
 }
